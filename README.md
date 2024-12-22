@@ -23,7 +23,7 @@ if err != nil {
 }
 
 // using FillStructFromForm
-err = FillStructFromForm(req, &formValues)
+err = forms.FillStructFromForm(req, &formValues)
 if err != nil {
 	// handle error
 }
