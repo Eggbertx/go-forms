@@ -1,4 +1,4 @@
-package formstructs
+package forms
 
 import (
 	"errors"
