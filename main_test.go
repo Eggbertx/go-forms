@@ -151,6 +151,30 @@ var (
 			fieldErrorType: fieldHasUnsupportedType,
 		},
 	}
+	testCasesFillStructFromForm = []testCase{
+		{
+			desc:   "baseline test",
+			method: http.MethodPost,
+			form: url.Values{
+				"username":     []string{"lorem"},
+				"password":     []string{"ipsum"},
+				"multipleInts": []string{"3", "4", "5"},
+				// "multipleStrings": []string{"lorem", "ipsum"},
+			},
+			expect: testStruct{
+				Username:        "lorem",
+				Password:        "ipsum",
+				Blah:            "blah blah blah",
+				MultipleInts:    []int{3, 4, 5},
+				MultipleStrings: []string{"blah blah"},
+			},
+			getData: func(req *http.Request) (*any, error) {
+				var ts testStruct
+				err := FillStructFromForm(req, &ts)
+				return boxPtr(&ts, err)
+			},
+		},
+	}
 )
 
 type testStruct struct {
@@ -159,6 +183,7 @@ type testStruct struct {
 	Blah            string   `form:"blah,default=blah blah blah"`
 	MultipleInts    []int    `form:"multipleInts,required"`
 	MultipleStrings []string `form:"multipleStrings,default=blah blah"`
+	SkipMe          string   `form:"-" method:"POST"`
 }
 
 type testRequiredAndDefault struct {
@@ -186,15 +211,7 @@ type testCase struct {
 }
 
 func (tc *testCase) doTest(t *testing.T) {
-	u := "http://localhost/"
-	if tc.method == http.MethodGet {
-		u += "?" + tc.form.Encode()
-	}
-	req, err := http.NewRequest(tc.method, u, strings.NewReader(tc.form.Encode()))
-	if !assert.NoError(t, err) {
-		return
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req := makeRequest(t, tc.form, tc.method)
 	dest, err := tc.getData(req)
 	if tc.expectError && assert.Error(t, err) {
 		assert.Equal(t, tc.fieldErrorType, err.(*fieldError).errorType)
@@ -212,6 +229,19 @@ func (tc *testCase) doTest(t *testing.T) {
 	}
 }
 
+func makeRequest(t *testing.T, form url.Values, method string) *http.Request {
+	u := "http://localhost/"
+	if method == http.MethodGet {
+		u += "?" + form.Encode()
+	}
+	req, err := http.NewRequest(method, u, strings.NewReader(form.Encode()))
+	if !assert.NoError(t, err) {
+		return nil
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return req
+}
+
 func boxPtr[T any](ptr *T, err error) (*any, error) {
 	if err != nil {
 		return nil, err
@@ -224,8 +254,57 @@ func getPtr[T any](a T) *T {
 	return &a
 }
 
+func TestRequirePointerToStruct(t *testing.T) {
+	req := makeRequest(t, url.Values{
+		"username": []string{"lorem"},
+	}, http.MethodPost)
+	if !assert.NotNil(t, req) {
+		return
+	}
+	var tc struct {
+		Username string `form:"username,required" method:"POST"`
+	}
+	err := FillStructFromForm(req, tc)
+	assert.ErrorIs(t, err, ErrNeedPointerToStruct)
+	err = FillStructFromForm(req, 3)
+	assert.ErrorIs(t, err, ErrNeedPointerToStruct)
+	ptr := &tc
+	ptr2ptr := &ptr
+	assert.Panics(t, func() {
+		err = FillStructFromForm(req, ptr2ptr)
+	})
+	_, err = GetStruct[int](req)
+	assert.ErrorIs(t, err, ErrNeedStructType)
+}
+
 func TestGetFormAsStruct(t *testing.T) {
 	for _, tC := range testCasesGetFormAsStruct {
 		t.Run(tC.desc, tC.doTest)
 	}
+}
+
+func TestFillStructFromForm(t *testing.T) {
+	for _, tC := range testCasesFillStructFromForm {
+		t.Run(tC.desc, tC.doTest)
+	}
+}
+
+func TestIgnoreRequirementsIfNotSameMethod(t *testing.T) {
+	req := makeRequest(t, url.Values{
+		"q": []string{"blah"},
+	}, http.MethodGet)
+	if !assert.NotNil(t, req) {
+		return
+	}
+	type loginForm struct {
+		Username string `form:"username,required,notempty" method:"POST"`
+		Password string `form:"password,required,notempty" method:"POST"`
+		LoginBtn string `form:"dologin,required,notempty" method:"POST"`
+	}
+	var form loginForm
+	err := FillStructFromForm(req, &form)
+	if !assert.NoError(t, err, "Expected required/notempty fields to be ignored since the method doesn't match") {
+		return
+	}
+
 }
