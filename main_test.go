@@ -174,6 +174,39 @@ var (
 				return boxPtr(&ts, err)
 			},
 		},
+		{
+			desc:   "test numeric types",
+			method: http.MethodPost,
+			form: url.Values{
+				"int8":    []string{"-1"},
+				"int16":   []string{"-2"},
+				"int32":   []string{"-3"},
+				"int64":   []string{"-4"},
+				"uint8":   []string{"1"},
+				"uint16":  []string{"2"},
+				"uint32":  []string{"3"},
+				"uint64":  []string{"4"},
+				"float32": []string{"3.14"},
+				"float64": []string{"-46"},
+			},
+			expect: testNumericTypes{
+				Int8:    -1,
+				Int16:   -2,
+				Int32:   -3,
+				Int64:   -4,
+				Uint8:   1,
+				Uint16:  2,
+				Uint32:  3,
+				Uint64:  4,
+				Float32: 3.14,
+				Float64: -46,
+			},
+			getData: func(req *http.Request) (*any, error) {
+				var tnt testNumericTypes
+				err := FillStructFromForm(req, &tnt)
+				return boxPtr(&tnt, err)
+			},
+		},
 	}
 )
 
@@ -194,6 +227,19 @@ type testMethodsStruct struct {
 	FieldGET  string `form:"fieldget" method:"GET"`
 	FieldPOST string `form:"fieldpost" method:"POST"`
 	FieldAll  string
+}
+
+type testNumericTypes struct {
+	Int8    int8    `form:"int8,required"`
+	Int16   int16   `form:"int16,required"`
+	Int32   int32   `form:"int32,required"`
+	Int64   int64   `form:"int64,required"`
+	Uint8   uint8   `form:"uint8,required"`
+	Uint16  uint16  `form:"uint16,required"`
+	Uint32  uint32  `form:"uint32,required"`
+	Uint64  uint64  `form:"uint64,required"`
+	Float32 float32 `form:"float32,required"`
+	Float64 float64 `form:"float64,required"`
 }
 
 type testPtrFields struct {

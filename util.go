@@ -26,7 +26,7 @@ func setFieldVal(name string, val reflect.Value, data string) error {
 	switch val.Kind() {
 	case reflect.Bool:
 		val.SetBool(data == "1" || data == "on")
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if data == "" {
 			data = "0"
 		}
@@ -35,6 +35,24 @@ func setFieldVal(name string, val reflect.Value, data string) error {
 			return &fieldError{structField: name, val: data, msg: err.Error(), errorType: fieldParsingError}
 		}
 		val.SetInt(int64(intVal))
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if data == "" {
+			data = "0"
+		}
+		uintVal, err := strconv.ParseUint(data, 10, 64)
+		if err != nil {
+			return &fieldError{structField: name, val: data, msg: err.Error(), errorType: fieldParsingError}
+		}
+		val.SetUint(uintVal)
+	case reflect.Float32, reflect.Float64:
+		if data == "" {
+			data = "0"
+		}
+		floatVal, err := strconv.ParseFloat(data, 64)
+		if err != nil {
+			return &fieldError{structField: name, val: data, msg: err.Error(), errorType: fieldParsingError}
+		}
+		val.SetFloat(floatVal)
 	case reflect.String:
 		val.SetString(data)
 	case reflect.Ptr, reflect.Interface:
@@ -57,7 +75,8 @@ func fillFieldValue(name string, structFieldVal reflect.Value, formFieldData []s
 		structFieldVal.Set(newSlice)
 	case reflect.Bool:
 		structFieldVal.SetBool(len(formFieldData) == 1 && (formFieldData[0] == "1" || formFieldData[0] == "on"))
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.String:
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16,
+		reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64, reflect.String:
 		return setFieldVal(name, structFieldVal, formFieldData[0])
 	case reflect.Ptr, reflect.Interface:
 		return setFieldVal(name, structFieldVal.Elem(), formFieldData[0])

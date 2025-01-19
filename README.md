@@ -1,5 +1,5 @@
 # go-forms
-A package for simplifying parsing and basic validation of HTTP forms into Go structs using struct tags
+A package for simplifying parsing and basic validation of HTTP forms into Go structs using struct tags. It supports strings, boolean values (set to true if the field value is "on" or "1", and false otherwise), numeric types, and slices of the same types.
 
 ## Usage
  
@@ -13,6 +13,8 @@ type loginForm struct {
 	Password string `form:"password,required,notempty" method:"POST"`
 	LoginBtn string `form:"dologin,required,notempty" method:"POST"`
 	Query string `form:"q"`
+	Pages []int `form:"pages" method="POST,PUT"` // multiple fields with the same name attribute
+	SomeCheckbox bool `form:"chk" method="POST"`
 }
 
 
