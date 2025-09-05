@@ -64,8 +64,35 @@ func FillStructFromForm(req *http.Request, dest any) error {
 			}
 		}
 		fieldKind := field.Type.Kind()
-		if fieldKind == reflect.Pointer || fieldKind == reflect.Interface || fieldKind == reflect.Struct {
-			return &fieldError{structField: field.Name, msg: "invalid field type, must be string, int, or bool", errorType: fieldHasUnsupportedType}
+		if fieldKind == reflect.Struct {
+			// nested struct, possibly composite
+			fieldVal := destVal.FieldByName(field.Name)
+			if !fieldVal.CanAddr() {
+				return &fieldError{structField: field.Name, msg: "unaddressible field", errorType: fieldUnaddressible}
+			}
+			if err = FillStructFromForm(req, fieldVal.Addr().Interface()); err != nil {
+				return err
+			}
+			continue
+		}
+		if fieldKind == reflect.Pointer {
+			// nested pointer to struct, possibly composite
+			if field.Type.Elem().Kind() == reflect.Struct {
+				fieldVal := destVal.FieldByName(field.Name)
+				if !fieldVal.CanAddr() {
+					return &fieldError{structField: field.Name, msg: "unaddressible field", errorType: fieldUnaddressible}
+				}
+				if fieldVal.IsNil() {
+					fieldVal.Set(reflect.New(field.Type.Elem()))
+				}
+				if err = FillStructFromForm(req, fieldVal.Interface()); err != nil {
+					return err
+				}
+				continue
+			}
+		}
+		if fieldKind == reflect.Interface {
+			return &fieldError{structField: field.Name, msg: "invalid field type, must be string, int, bool, a struct, or pointer to a struct with these fields", errorType: fieldHasUnsupportedType}
 		}
 
 		fieldOptions, _ := parseFieldOptions(req, field)

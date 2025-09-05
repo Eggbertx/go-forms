@@ -148,7 +148,7 @@ var (
 				return boxPtr(GetStruct[testPtrFields](req))
 			},
 			expectError:    true,
-			fieldErrorType: fieldHasUnsupportedType,
+			fieldErrorType: fieldUnaddressible,
 		},
 	}
 	testCasesFillStructFromForm = []testCase{
@@ -353,4 +353,73 @@ func TestIgnoreRequirementsIfNotSameMethod(t *testing.T) {
 		return
 	}
 
+}
+
+type Base struct {
+	A string `form:"a,required"`
+}
+
+type baseUnexported struct {
+	A string `form:"a,required"`
+}
+
+type composed struct {
+	Base
+	B int `form:"b,required"`
+}
+
+type composedPtr struct {
+	*Base
+	B int `form:"b,required"`
+}
+
+type composedUnexported struct {
+	baseUnexported
+	B int `form:"b,required"`
+}
+type composedUnexportedPtr struct {
+	*baseUnexported
+	B int `form:"b,required"`
+}
+
+func TestStructsWithComposition(t *testing.T) {
+	req := makeRequest(t, url.Values{
+		"a": []string{"aa"},
+		"b": []string{"42"},
+	}, http.MethodPost)
+	if !assert.NotNil(t, req) {
+		return
+	}
+	t.Run("composed struct", func(t *testing.T) {
+		var form composed
+		err := FillStructFromForm(req, &form)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.Equal(t, "aa", form.A)
+		assert.Equal(t, 42, form.B)
+	})
+	t.Run("composed pointer to struct", func(t *testing.T) {
+		var formPtr composedPtr
+		err := FillStructFromForm(req, &formPtr)
+		if !assert.NoError(t, err) {
+			return
+		}
+		assert.Equal(t, "aa", formPtr.A)
+		assert.Equal(t, 42, formPtr.B)
+	})
+
+	t.Run("unexported embedded struct fields", func(t *testing.T) {
+		var formUnexported composedUnexported
+		assert.PanicsWithValue(t, "reflect.Value.Interface: cannot return value obtained from unexported field or method", func() {
+			FillStructFromForm(req, &formUnexported)
+		})
+	})
+
+	t.Run("unexported embedded struct pointer fields", func(t *testing.T) {
+		var formUnexportedPtr composedUnexportedPtr
+		assert.PanicsWithValue(t, "reflect: reflect.Value.Set using value obtained using unexported field", func() {
+			FillStructFromForm(req, &formUnexportedPtr)
+		})
+	})
 }
