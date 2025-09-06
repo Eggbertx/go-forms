@@ -1,6 +1,8 @@
 # go-forms
 A package for simplifying parsing and basic validation of HTTP forms into Go structs using struct tags. It supports strings, boolean values (set to true if the field value is "on" or "1", and false otherwise), numeric types, and slices of the same types.
 
+It also supports embedded structs and pointers to embedded structs, but because of the way Go addresses the inner struct, the struct being embedded **must be exported**. The outer struct does not need to be exported.
+
 ## Usage
  
 ```Go
@@ -17,7 +19,6 @@ type loginForm struct {
 	SomeCheckbox bool `form:"chk" method="POST"`
 }
 
-
 // using GetStruct
 formValues, err := forms.GetStruct[loginForm](request)
 if err != nil {
@@ -26,6 +27,34 @@ if err != nil {
 
 // using FillStructFromForm
 err = forms.FillStructFromForm(req, &formValues)
+if err != nil {
+	// handle error
+}
+
+type ComposedBase struct {
+	A string `form:"a"`
+}
+
+type ComposedStruct struct {
+	ComposedBase
+	B string `form:"b"`
+	C int    `form:"c"`
+}
+
+type ComposedStructPtr struct {
+	*ComposedBase
+	B string `form:"b"`
+	C int    `form:"c"`
+}
+
+var formComposed ComposedStruct
+err = forms.FillStructFromForm(req, &formComposed)
+if err != nil {
+	// handle error
+}
+
+var formComposedPtr ComposedStructPtr
+err = forms.FillStructFromForm(req, &formComposedPtr)
 if err != nil {
 	// handle error
 }
